@@ -1,0 +1,484 @@
+#Code for Linking response traits of novel seaweed communities to varation in enviornmetnal drivers across microhabitats of a tropical reef
+#authors: H. Ashworth, G. Colaco, K. Cooper, L. Smith, A. Tsai, B. Woo, A. Ford, P. Fong
+# this code was compiled by L. Smith
+
+#packages
+library(librarian) 
+shelf(vegan, cluster, readxl, ggplot2, dplyr, devtools, factoextra, ggpubr, car, reshape2, FactoMineR, missMDA, 
+forcats, dunn.test)
+
+#Download Dataset
+TraitData_ForPublishing2024 <- read_excel("Microhabitats_Data.xlsx", sheet = "Micro_data", 
+  col types = "text", "text", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", 
+  "numeric", "numeric"))
+
+#species table - SUPPLEMENT
+table(TraitData_ForPublishing2024$Species,TraitData_ForPublishing2024$Microhabitat)
+
+#set seed
+set.seed(11)
+
+#subset  data
+NumericData<-TraitData_ForPublishing2024[,c(4:12)]
+CategoricalData<-TraitData_ForPublishing2024[,c(1:3)]
+
+#any missing values are predicted using the iterative PCA algorithm for a predefined number of dimensions. Then, PCA is performed on the imputed data set
+#estim_ncpPCA estimates the number of components from incomplete data
+res.comp<-imputePCA(NumericData,ncp=7)
+res.comp2 <- imputePCA(NumericData) 
+res.comp$completeObs[1:3,]
+
+#combine imputed numerical dataset with categorical data
+imp2<-cbind.data.frame(res.comp$completeObs,CategoricalData)
+
+#create matrix for PCA
+imp.mat <- as.matrix (imp2[,1:9])
+#prcomp for PCA
+imp.pca <- prcomp(imp.mat, scale = TRUE)
+#visualize PCA (determine %contributions)
+fviz_pca_ind(imp.pca)
+fviz_pca_var(imp.pca)
+
+#run permanova test
+TJ.dist2<-vegdist(imp2[,1:9],method="bray")
+TJ.perm<-adonis2(TJ.dist2~Microhabitat,data=imp2,permutations = 999,method = "bray")
+TJ.perm
+
+##Figure 5 ###########
+#plots PCA with colored ellipses and labels
+pcaplot<-fviz_pca_ind(imp.pca, geom="point", 
+                      habillage= TraitData_ForPublishing2024$Microhabitat, addEllipses = TRUE, 
+                      ellipse.level=0.5,ellipse.alpha=0,pointsize=3,legend.title="Microhabitats") +
+  xlim(-4,4)+ #this was limiting the the final number of points, removing 23
+  ylim(-2.5,5)+
+  scale_color_manual(name="Microhabitats", values=c("#81C8D6","#053F5C","#429EBD","#F7AD19","#F27F0C"))+
+  labs(x="PC1 (32.6%)", y="PC2 (22%)")+theme(title = element_blank())+
+  theme(axis.title.y=element_text(size=20),
+        legend.position = "none")+
+ # theme(legend.position = 'top')+
+  theme(axis.title.x=element_text(size=20))+
+  theme(panel.background=element_rect(fill="white"))+
+  theme(axis.text.x=element_text(size=15))+
+  theme(axis.text.y=element_text(size=15))+
+  theme(panel.grid = element_blank())+
+  theme(legend.text = element_text(size=20))
+
+#plot PCA loading plot without vectors
+PCA_full <- fviz_pca_var(imp.pca,labelsize=0)+
+  labs(x="PC1 (32.6%)", y="PC2 (22%)")+theme(title = element_blank())+
+  xlim(-4,4)+ #this was limiting the the final number of points, removing 23
+  ylim(-2.5,5)+
+  theme(axis.title.y=element_text(size=20))+
+  theme(axis.title.x=element_text(size=20))+
+  theme(panel.background=element_rect(fill="white"))+
+  theme(axis.text.x=element_text(size=15))+
+  theme(axis.text.y=element_text(size=15))+
+  theme(panel.grid = element_blank())
+
+##supplement figure 2 ######
+#plot the percentage contribution of each vector on the loading plot to the axes of the PCA
+ContPC1 <- fviz_contrib(imp.pca,choice="var",axes=1,top=9, fill = "grey", color = "black")+
+  labs(title = "Trait contributions to PC1")+
+  ylim(0,35)+
+  theme(plot.background = element_blank(),
+        legend.position = "none",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+ContPC2 <- fviz_contrib(imp.pca,choice="var",axes=2,top=9, fill = "grey", color = "black")+
+  labs(title = "Trait contributions to PC2")+
+  ylim(0,35)+
+  theme(plot.background = element_blank(),
+        legend.position = "none",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+ContPC3 <- fviz_contrib(imp.pca,choice="var",axes=3,top=9, fill = "grey", color = "black")+
+  labs(title = "Trait contributions to PC3")+
+  ylim(0,35)+
+  theme(plot.background = element_blank(),
+        legend.position = "none",
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+##supplement figure 3 ######
+#supplement figure 3
+pca1v3<-fviz_pca_biplot(imp.pca, axes = c(1,3), label = " ", col.var="black",
+                      habillage=res.pcatest$call$X$Microhabitat, addEllipses = FALSE, pointsize=2,
+                      legend.title="Microhabitats")+
+  #xlim(-5,3)+ #this was limiting the the final number of points, removing 23
+  #ylim(-3,3)+
+  scale_color_manual(name="Microhabitats", values=c("#81C8D6","#053F5C","#429EBD","#F7AD19","#F27F0C"))+
+  labs(x="PC1 (32.6%)", y="PC3 (12.1%)")+theme(title = element_blank())+
+  theme(axis.title.y=element_text(size=20),
+        legend.position = "none")+
+  #theme(legend.position = 'right')+
+  theme(axis.title.x=element_text(size=20))+
+  theme(panel.background=element_rect(fill="white"))+
+  theme(axis.text.x=element_text(size=25))+
+  theme(axis.text.y=element_text(size=25))+
+  theme(panel.grid = element_blank())+
+  theme(legend.text = element_text(size=20))
+
+fviz_pca_var(imp.pca, axes = c(2,3))
+pca2v3<-fviz_pca_biplot(imp.pca, axes = c(2,3), label = " ", col.var="black",
+                        habillage=res.pcatest$call$X$Microhabitat, addEllipses = FALSE, pointsize=2,
+                        legend.title="Microhabitats")+
+  #xlim(-5,3)+ #this was limiting the the final number of points, removing 23
+  #ylim(-3,3)+
+  scale_color_manual(name="Microhabitats", values=c("#81C8D6","#053F5C","#429EBD","#F7AD19","#F27F0C"))+
+  labs(x="PC2 (22%)", y="PC3 (12.1%)")+theme(title = element_blank())+
+  theme(axis.title.y=element_text(size=20),
+        legend.position = "none")+
+  #theme(legend.position = 'right')+
+  theme(axis.title.x=element_text(size=20))+
+  theme(panel.background=element_rect(fill="white"))+
+  theme(axis.text.x=element_text(size=25))+
+  theme(axis.text.y=element_text(size=25))+
+  theme(panel.grid = element_blank())+
+  theme(legend.text = element_text(size=20))
+
+
+##Bar Graphs ###
+
+#height
+HeightSummary <- TraitData_ForPublishing2024 %>% 
+  group_by(Microhabitat) %>% 
+  summarise(mean_h = mean (Height), 
+            se = sd(Height)/sqrt(n())) 
+head(HeightSummary)
+
+HeightSummary <- as.data.frame(HeightSummary)
+HeightSummary$Microhabitat[HeightSummary$Microhabitat == 'Deep Slope'] <- 'Reef Slope' #rename to "reef slope"
+
+h.label <- c("b", "a", "a", "a", "a")
+
+H_bar <- ggplot(HeightSummary, aes(x = factor(Microhabitat, levels = c("Sand Flat", "Reef Flat", "Coral Tops", "Reef Crest", "Reef Slope")), y = mean_h,
+                                     fill = Microhabitat, colour = Microhabitat))+
+  geom_bar(stat = "identity", position = "dodge")+ 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 19))+ 
+  geom_text(aes(label=h.label, y=mean_h+abs(se), vjust=-0.5), position=position_dodge(.9), size=10)+
+  geom_errorbar(aes(ymin=mean_h-se, ymax = mean_h+se), position = position_dodge(0.9), width = 0.25)+
+  labs(x = " ", y = "Height (cm)")+ #label axes
+  scale_fill_manual(values=c("#81C8D6", "#429EBD","#F7AD19","#053F5C", "#F27F0C"))+
+  scale_color_manual(values = c("black", "black", "black", "black", "black", "black")) + #set the error bar colors
+  theme_classic()+
+  theme(text = element_text(size = 25),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 20))+
+  theme(legend.position = "none")
+
+## H:WW Bar Graph ##
+H_WWSummary <- TraitData_ForPublishing2024 %>% 
+  group_by(Microhabitat) %>% 
+  summarise(mean_hww = mean (`H:WW`), 
+            se = sd(`H:WW`)/sqrt(n())) 
+head(H_WWSummary)
+
+H_WWSummary <- as.data.frame(H_WWSummary)
+H_WWSummary$Microhabitat[H_WWSummary$Microhabitat == 'Deep Slope'] <- 'Reef Slope' #rename to "reef slope"
+
+hww.label <- c("a", "bc", "ab", "ab", "c")
+
+HWW_bar <- ggplot(H_WWSummary, aes(x = factor(Microhabitat, levels = c("Sand Flat", "Reef Flat", "Coral Tops", "Reef Crest", "Reef Slope")), y = mean_hww,
+                                   fill = Microhabitat, colour = Microhabitat))+
+  geom_bar(stat = "identity", position = "dodge")+ 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 17))+ 
+  geom_text(aes(label=hww.label, y=mean_hww+abs(se), vjust=-0.5), position=position_dodge(.9), size=10)+
+  geom_errorbar(aes(ymin=mean_hww-se, ymax = mean_hww+se), position = position_dodge(0.9), width = 0.25)+ #add error bars based on SE
+  labs(x = " ", y = "H:WW")+ #label axes
+  scale_fill_manual(values=c("#81C8D6", "#429EBD","#F7AD19","#053F5C", "#F27F0C"))+
+  scale_color_manual(values = c("black", "black", "black", "black", "black", "black")) + #set the error bar colors
+  theme_classic()+
+  theme(text = element_text(size = 25),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 20))+
+  theme(legend.position = "none")
+HWW_bar
+
+## SA:WW Bar Graph ##
+SA_WWSummary <- TraitData_ForPublishing2024 %>% 
+  group_by(Microhabitat) %>% 
+  summarise(mean = mean (`SA:WW`), 
+            se = sd(`SA:WW`)/sqrt(n())) 
+head(SA_WWSummary)
+
+SA_WWSummary <- as.data.frame(SA_WWSummary)
+SA_WWSummary$Microhabitat[SA_WWSummary$Microhabitat == 'Deep Slope'] <- 'Reef Slope' #rename to "reef slope"
+
+saww.label <- c("a", "b", "b", "b", "b")
+
+SAWW_bar <- ggplot(SA_WWSummary, aes(x = factor(Microhabitat, levels = c("Sand Flat", "Reef Flat", "Coral Tops", "Reef Crest", "Reef Slope")), y = mean,
+                                   fill = Microhabitat, colour = Microhabitat))+
+  geom_bar(stat = "identity", position = "dodge")+ 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 55))+ 
+  geom_text(aes(label=saww.label, y=mean+abs(se), vjust=-0.5), position=position_dodge(.9), size=10)+
+  geom_errorbar(aes(ymin=mean-se, ymax = mean+se), position = position_dodge(0.9), width = 0.25)+ #add error bars based on SE
+  labs(x = " ", y = "SA:WW")+ #label axes
+  scale_fill_manual(values=c("#81C8D6", "#429EBD","#F7AD19","#053F5C", "#F27F0C"))+
+  scale_color_manual(values = c("black", "black", "black", "black", "black", "black")) + #set the error bar colors
+  theme_classic()+
+  theme(text = element_text(size = 25),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 20))+
+  theme(legend.position = "none")
+SAWW_bar
+
+## BWW:WW Bar Graph ##
+#remove missing data
+BWW_habitat <-  as.data.frame(cbind(TraitData_ForPublishing2024$Microhabitat, TraitData_ForPublishing2024$`BWW:WW`))
+BWW_habitat <- na.omit(BWW_habitat)
+colnames(BWW_habitat) <- c("Microhabitat", "BWW:WW")
+BWW_habitat <- transform(BWW_habitat, `BWW:WW` = as.numeric(`BWW:WW`))
+head(BWW_habitat) 
+
+BW_WWSummary <- BWW_habitat %>% 
+  group_by(Microhabitat) %>% 
+  summarise(mean = mean (`BWW.WW`), 
+            se = sd(`BWW.WW`)/sqrt(n())) 
+head(BW_WWSummary)
+
+
+BW_WWSummary <- as.data.frame(BW_WWSummary)
+BW_WWSummary$Microhabitat[BW_WWSummary$Microhabitat == 'Deep Slope'] <- 'Reef Slope' #rename to "reef slope"
+
+bwww.label <- c("a", "b", "a", "a", "a")
+
+BWW.WW_bar <- ggplot(BW_WWSummary, aes(x = factor(Microhabitat, levels = c("Sand Flat", "Reef Flat", "Coral Tops", "Reef Crest", "Reef Slope")), y = mean,
+                                     fill = Microhabitat, colour = Microhabitat))+
+  geom_bar(stat = "identity", position = "dodge")+ 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 1.2))+ 
+  geom_text(aes(label=bwww.label, y=mean+abs(se), vjust=-0.5), position=position_dodge(.9), size=10)+
+  geom_errorbar(aes(ymin=mean-se, ymax = mean+se), position = position_dodge(0.9), width = 0.25)+ #add error bars based on SE
+  labs(x = " ", y = "BWW:WW")+ #label axes
+  scale_fill_manual(values=c("#81C8D6", "#429EBD","#F7AD19","#053F5C", "#F27F0C"))+
+  scale_color_manual(values = c("black", "black", "black", "black", "black", "black")) + #set the error bar colors
+  theme_classic()+
+  theme(text = element_text(size = 25),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 20))+
+  theme(legend.position = "none")
+BWW.WW_bar
+
+##Tensile Strength
+TS_Summary <- TraitData_ForPublishing2024 %>% 
+  group_by(Microhabitat) %>% 
+  summarise(mean = mean (`Tensile Strength`), 
+            se = sd(`Tensile Strength`)/sqrt(n())) 
+head(TS_Summary)
+
+TS_Summary <- as.data.frame(TS_Summary)
+TS_Summary$Microhabitat[TS_Summary$Microhabitat == 'Deep Slope'] <- 'Reef Slope' #rename to "reef slope"
+
+ts.label <- c("c", "a", "b", "b", "ab")
+
+TS_bar <- ggplot(TS_Summary, aes(x = factor(Microhabitat, levels = c("Sand Flat", "Reef Flat", "Coral Tops", "Reef Crest", "Reef Slope")), y = mean,
+                                     fill = Microhabitat, colour = Microhabitat))+
+  geom_bar(stat = "identity", position = "dodge")+ 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 1300))+ 
+  geom_text(aes(label=ts.label, y=mean+abs(se), vjust=-0.5), position=position_dodge(.9), size=10)+
+  geom_errorbar(aes(ymin=mean-se, ymax = mean+se), position = position_dodge(0.9), width = 0.25)+ #add error bars based on SE
+  labs(x = " ", y = "Tensile Strength (g)")+ #label axes
+  scale_fill_manual(values=c("#81C8D6", "#429EBD","#F7AD19","#053F5C", "#F27F0C"))+
+  scale_color_manual(values = c("black", "black", "black", "black", "black", "black")) + #set the error bar colors
+  theme_classic()+
+  theme(text = element_text(size = 22),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 10))+
+  theme(legend.position = "none")
+TS_bar
+
+#Dry weight to wet weight ratio (has an NA)
+DW.WW_habitat <-  as.data.frame(cbind(TraitData_ForPublishing2024$Microhabitat, TraitData_ForPublishing2024$`DW:WW`))
+DW.WW_habitat <- na.omit(DW.WW_habitat)
+colnames(DW.WW_habitat) <- c("Microhabitat", "DW:WW")
+DW.WW_habitat <- transform(DW.WW_habitat, `DW:WW` = as.numeric(`DW:WW`))
+head(DW.WW_habitat) 
+
+DW.WW_Summary <- DW.WW_habitat %>% 
+  group_by(Microhabitat) %>% 
+  summarise(mean = mean (`DW.WW`), 
+            se = sd(`DW.WW`)/sqrt(n())) 
+head(DW.WW_Summary)
+
+DW.WW_Summary <- as.data.frame(DW.WW_Summary)
+DW.WW_Summary$Microhabitat[DW.WW_Summary$Microhabitat == 'Deep Slope'] <- 'Reef Slope' #rename to "reef slope"
+
+dwww.label <- c("abc", "a", "ab", "bc", "c")
+
+DWWW_bar <- ggplot(DW.WW_Summary, aes(x = factor(Microhabitat, levels = c("Sand Flat", "Reef Flat", "Coral Tops", "Reef Crest", "Reef Slope")), y = mean,
+                                     fill = Microhabitat, colour = Microhabitat))+
+  geom_bar(stat = "identity", position = "dodge")+ 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 0.309))+ 
+  geom_text(aes(label=dwww.label, y=mean+abs(se), vjust=-0.5), position=position_dodge(.9), size=10)+
+  geom_errorbar(aes(ymin=mean-se, ymax = mean+se), position = position_dodge(0.9), width = 0.25)+ #add error bars based on SE
+  labs(x = " ", y = "DW:WW")+ #label axes
+  scale_fill_manual(values=c("#81C8D6", "#429EBD","#F7AD19","#053F5C", "#F27F0C"))+
+  scale_color_manual(values = c("black", "black", "black", "black", "black", "black")) + #set the error bar colors
+  theme_classic()+
+  theme(text = element_text(size = 22),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 15))+
+  theme(legend.position = "none")
+DWWW_bar
+
+##Thallus toughness
+Pen_Summary <- TraitData_ForPublishing2024 %>% 
+  group_by(Microhabitat) %>% 
+  summarise(mean = mean (`Thallus Toughness`), 
+            se = sd(`Thallus Toughness`)/sqrt(n())) 
+head(Pen_Summary)
+
+Pen_Summary <- as.data.frame(Pen_Summary)
+Pen_Summary$Microhabitat[Pen_Summary$Microhabitat == 'Deep Slope'] <- 'Reef Slope' #rename to "reef slope"
+
+pen.label <- c("b", "a", "b", "b", "b")
+
+Pen_bar <- ggplot(Pen_Summary, aes(x = factor(Microhabitat, levels = c("Sand Flat", "Reef Flat", "Coral Tops", "Reef Crest", "Reef Slope")), y = mean,
+                                 fill = Microhabitat, colour = Microhabitat))+
+  geom_bar(stat = "identity", position = "dodge")+ 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 42))+ 
+  geom_text(aes(label=pen.label, y=mean+abs(se), vjust=-0.5), position=position_dodge(.9), size=10)+
+  geom_errorbar(aes(ymin=mean-se, ymax = mean+se), position = position_dodge(0.9), width = 0.25)+ #add error bars based on SE
+  labs(x = " ", y = "Thallus Toughness (g)")+ #label axes
+  scale_fill_manual(values=c("#81C8D6", "#429EBD","#F7AD19","#053F5C", "#F27F0C"))+
+  scale_color_manual(values = c("black", "black", "black", "black", "black", "black")) + #set the error bar colors
+  theme_classic()+
+  theme(text = element_text(size = 22),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 15))+
+  theme(legend.position = "none")
+Pen_bar
+
+##percent calcification
+PC_Summary <- TraitData_ForPublishing2024 %>% 
+  group_by(Microhabitat) %>% 
+  summarise(mean = mean (`% Calcification`), 
+            se = sd(`% Calcification`)/sqrt(n())) 
+head(PC_Summary)
+
+PC_Summary <- as.data.frame(PC_Summary)
+PC_Summary$Microhabitat[PC_Summary$Microhabitat == 'Deep Slope'] <- 'Reef Slope' #rename to "reef slope"
+
+pc.label <- c("ab", "a", "bc", "bc", "c")
+
+PC_bar <- ggplot(PC_Summary, aes(x = factor(Microhabitat, levels = c("Sand Flat", "Reef Flat", "Coral Tops", "Reef Crest", "Reef Slope")), y = mean,
+                                   fill = Microhabitat, colour = Microhabitat))+
+  geom_bar(stat = "identity", position = "dodge")+ 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 31))+ 
+  geom_text(aes(label=pc.label, y=mean+abs(se), vjust=-0.5), position=position_dodge(.9), size=10)+
+  geom_errorbar(aes(ymin=mean-se, ymax = mean+se), position = position_dodge(0.9), width = 0.25)+ #add error bars based on SE
+  labs(x = " ", y = "Percent Calcification")+ #label axes
+  scale_fill_manual(values=c("#81C8D6", "#429EBD","#F7AD19","#053F5C", "#F27F0C"))+
+  scale_color_manual(values = c("black", "black", "black", "black", "black", "black")) + #set the error bar colors
+  theme_classic()+
+  theme(text = element_text(size = 22),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 15))+
+  theme(legend.position = "none")
+PC_bar
+
+#growth data
+growthdf<-data.frame(Microhabitat=c("Sand Flat","Reef Flat","Coral Tops","Reef Crest","Reef Slope"), Growth=c(9.889, 9.944, 6.278, 5.222, 3.571), se=c(1.523334086,1.199279619,0.9686442097,1.036588149,0.5199659182))
+growthdf$fact<-factor(growthdf$Microhabitat,levels=growthdf$Microhabitat)
+
+gp.label <- c("b", "b", "ab", "ab", "a")
+
+GP_bar <- ggplot(growthdf, aes(x = factor(Microhabitat, levels = c("Sand Flat", "Reef Flat", "Coral Tops", "Reef Crest", "Reef Slope")), y = Growth,
+                                 fill = Microhabitat, colour = Microhabitat))+
+  geom_bar(stat = "identity", position = "dodge")+ 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 13))+ 
+  geom_text(aes(label=gp.label, y=Growth+abs(se), vjust=-0.5), position=position_dodge(.9), size=10)+
+  geom_errorbar(aes(ymin=Growth-se, ymax = Growth+se), position = position_dodge(0.9), width = 0.25)+ #add error bars based on SE
+  labs(x = " ", y = "Growth Potential (% change per day)")+ #label axes
+  scale_fill_manual(values=c("#81C8D6", "#429EBD","#F7AD19","#053F5C", "#F27F0C"))+
+  scale_color_manual(values = c("black", "black", "black", "black", "black", "black")) + #set the error bar colors
+  theme_classic()+
+  theme(text = element_text(size = 13),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 10))+
+  theme(legend.position = "none")
+
+GP_bar
+
+#herbivory data
+herbivorydf<-data.frame(Microhabitat=c("Sand Flat","Reef Flat","Coral Tops","Reef Crest","Reef Slope"), mean=c(9.831175999, 7.777554909, 7.607347687, 5.854545455, 4.511848341), se=c(1.195, 1.097, 1.204, 1.351, 0.815))
+herbivorydf$fact<-factor(herbivorydf$Microhabitat,levels=herbivorydf$Microhabitat)
+
+hv.label <- c("b", "ab", "ab", "ab", "a")
+
+HV_bar <- ggplot(herbivorydf, aes(x = factor(Microhabitat, levels = c("Sand Flat", "Reef Flat", "Coral Tops", "Reef Crest", "Reef Slope")), y = mean,
+                               fill = Microhabitat, colour = Microhabitat))+
+  geom_bar(stat = "identity", position = "dodge")+ 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 12.4))+ 
+  geom_text(aes(label=hv.label, y=mean+abs(se), vjust=-0.5), position=position_dodge(.9), size=10)+
+  geom_errorbar(aes(ymin=mean-se, ymax = mean+se), position = position_dodge(0.9), width = 0.25)+ #add error bars based on SE
+  labs(x = " ", y = "Herbivory Rate (% consumed per hour)")+ #label axes
+  scale_fill_manual(values=c("#81C8D6", "#429EBD","#F7AD19","#053F5C", "#F27F0C"))+
+  scale_color_manual(values = c("black", "black", "black", "black", "black", "black")) + #set the error bar colors
+  theme_classic()+
+  theme(text = element_text(size = 13),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 10))+
+  theme(legend.position = "none")
+
+HV_bar
+
+#clodd cards data
+cloddf<-data.frame(Microhabitat=c("Sand Flat","Reef Flat","Coral Tops","Reef Crest","Reef Slope"), mean=c(1.461675887, 1.490943695, 1.741899701, 1.315731904, 1.0396069), se=c(0.02192156625, 0.01848537491, 0.05009194141, 0.09178192035, 0.01481455553))
+cloddf$fact<-factor(cloddf$Microhabitat,levels=cloddf$Microhabitat)
+
+cd.label <- c("b", "bc", "c", "ab", "a")
+
+CD_bar <- ggplot(cloddf, aes(x = factor(Microhabitat, levels = c("Sand Flat", "Reef Flat", "Coral Tops", "Reef Crest", "Reef Slope")), y = mean,
+                                  fill = Microhabitat, colour = Microhabitat))+
+  geom_bar(stat = "identity", position = "dodge")+ 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 2.1))+ 
+  geom_text(aes(label=cd.label, y=mean+abs(se), vjust=-0.5), position=position_dodge(.9), size=10)+
+  geom_errorbar(aes(ymin=mean-se, ymax = mean+se), position = position_dodge(0.9), width = 0.25)+ #add error bars based on SE
+  labs(x = " ", y = "Net Water Motion (% dissolution)")+ #label axes
+  scale_fill_manual(values=c("#81C8D6", "#429EBD","#F7AD19","#053F5C", "#F27F0C"))+
+  scale_color_manual(values = c("black", "black", "black", "black", "black", "black")) + #set the error bar colors
+  theme_classic()+
+  theme(text = element_text(size = 13),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 10))+
+  theme(legend.position = "none")
+
+CD_bar
+
+#Light Data
+
+lightdf<-data.frame(Microhabitat=c("Sand Flat","Reef Flat","Coral Tops","Reef Crest","Reef Slope"), 
+                  mean=c(9194.936823, 4256.010242, 9711.237, 2905.782692,830.460422), 
+                  se=c(125.2784466, 43.52544314, 198.2076, 69.68849889,73.90777491))
+lightdf$fact<-factor(lightdf$Microhabitat,levels=lightdf$Microhabitat)
+
+lg.label <- c(" ", " ", " ", " ", " ")
+
+LG_bar <- ggplot(lightdf, aes(x = factor(Microhabitat, levels = c("Sand Flat", "Reef Flat", "Coral Tops", "Reef Crest", "Reef Slope")), y = mean,
+                             fill = Microhabitat, colour = Microhabitat))+
+  geom_bar(stat = "identity", position = "dodge")+ 
+  scale_y_continuous(expand = c(0,0), limits = c(0, 10000))+ 
+  geom_text(aes(label=lg.label, y=mean+abs(se), vjust=-0.5), position=position_dodge(.9), size=10)+
+  geom_errorbar(aes(ymin=mean-se, ymax = mean+se), position = position_dodge(0.9), width = 0.25)+ #add error bars based on SE
+  labs(x = " ", y = "Light Intensity (lux)")+ #label axes
+  scale_fill_manual(values=c("#81C8D6", "#429EBD","#F7AD19","#053F5C", "#F27F0C"))+
+  scale_color_manual(values = c("black", "black", "black", "black", "black", "black")) + #set the error bar colors
+  theme_classic()+
+  theme(text = element_text(size = 13),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(size = 10))+
+  theme(legend.position = "none")
+
+LG_bar
